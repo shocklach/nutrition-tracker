@@ -46,7 +46,7 @@ export default function History({ onGoToday, onSelectDay }: Props) {
           >
             <span className="history-date">{formatDateKey(d.dateKey)}</span>
             <span className="history-stats">
-              {d.totalProtein}g &middot; {d.totalCalories} cal
+              {d.totalProtein}g &middot; {d.totalCalories} cal &middot; {d.totalSaturatedFat}g sat. fat
             </span>
             <span className="history-chevron">&rsaquo;</span>
           </div>

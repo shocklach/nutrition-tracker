@@ -26,7 +26,7 @@ export async function addEntry(entry: Entry): Promise<void> {
 
 export async function updateEntry(
   id: string,
-  updates: Partial<Pick<Entry, "proteinGrams" | "calories">>
+  updates: Partial<Pick<Entry, "proteinGrams" | "calories" | "saturatedFatGrams">>
 ): Promise<void> {
   const db = await getDb();
   const tx = db.transaction(STORE, "readwrite");
@@ -51,15 +51,16 @@ export async function listRecentDays(n: number): Promise<DaySummary[]> {
   const db = await getDb();
   const all: Entry[] = await db.getAll(STORE);
 
-  const map = new Map<string, { totalProtein: number; totalCalories: number; entryCount: number }>();
+  const map = new Map<string, { totalProtein: number; totalCalories: number; totalSaturatedFat: number; entryCount: number }>();
   for (const e of all) {
     let day = map.get(e.dateKey);
     if (!day) {
-      day = { totalProtein: 0, totalCalories: 0, entryCount: 0 };
+      day = { totalProtein: 0, totalCalories: 0, totalSaturatedFat: 0, entryCount: 0 };
       map.set(e.dateKey, day);
     }
     day.totalProtein += e.proteinGrams;
     day.totalCalories += e.calories;
+    day.totalSaturatedFat += e.saturatedFatGrams ?? 0;
     day.entryCount += 1;
   }
 
@@ -76,21 +77,22 @@ export async function exportCsv(dateKeys?: string[]): Promise<string> {
   const db = await getDb();
   const all: Entry[] = await db.getAll(STORE);
 
-  const map = new Map<string, { totalProtein: number; totalCalories: number }>();
+  const map = new Map<string, { totalProtein: number; totalCalories: number; totalSaturatedFat: number }>();
   for (const e of all) {
     if (dateKeys && !dateKeys.includes(e.dateKey)) continue;
     let day = map.get(e.dateKey);
     if (!day) {
-      day = { totalProtein: 0, totalCalories: 0 };
+      day = { totalProtein: 0, totalCalories: 0, totalSaturatedFat: 0 };
       map.set(e.dateKey, day);
     }
     day.totalProtein += e.proteinGrams;
     day.totalCalories += e.calories;
+    day.totalSaturatedFat += e.saturatedFatGrams ?? 0;
   }
 
   const rows = Array.from(map.entries())
     .sort(([a], [b]) => b.localeCompare(a))
-    .map(([dateKey, d]) => `${dateKey},${d.totalProtein},${d.totalCalories}`);
+    .map(([dateKey, d]) => `${dateKey},${d.totalProtein},${d.totalCalories},${d.totalSaturatedFat}`);
 
-  return ["date,total_protein_grams,total_calories", ...rows].join("\n");
+  return ["date,total_protein_grams,total_calories,total_saturated_fat_grams", ...rows].join("\n");
 }

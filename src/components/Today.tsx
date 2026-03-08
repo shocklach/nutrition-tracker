@@ -12,6 +12,7 @@ export default function Today({ dateKey, onGoHistory }: Props) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [protein, setProtein] = useState("");
   const [calories, setCalories] = useState("");
+  const [saturatedFat, setSaturatedFat] = useState("");
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -26,13 +27,15 @@ export default function Today({ dateKey, onGoHistory }: Props) {
 
   const totalProtein = entries.reduce((s, e) => s + e.proteinGrams, 0);
   const totalCalories = entries.reduce((s, e) => s + e.calories, 0);
+  const totalSaturatedFat = entries.reduce((s, e) => s + (e.saturatedFatGrams ?? 0), 0);
 
   const handleSubmit = async () => {
     setError("");
     const p = parseInt(protein, 10);
     const c = parseInt(calories, 10);
+    const f = parseInt(saturatedFat, 10);
 
-    if (isNaN(p) || isNaN(c)) {
+    if (isNaN(p) || isNaN(c) || isNaN(f)) {
       setError("Enter valid numbers.");
       return;
     }
@@ -44,6 +47,10 @@ export default function Today({ dateKey, onGoHistory }: Props) {
       setError("Calories must be 0-5000.");
       return;
     }
+    if (f < 0 || f > 200) {
+      setError("Saturated fat must be 0-200g.");
+      return;
+    }
 
     const entry: Entry = {
       id: newId(),
@@ -51,11 +58,13 @@ export default function Today({ dateKey, onGoHistory }: Props) {
       dateKey,
       proteinGrams: p,
       calories: c,
+      saturatedFatGrams: f,
     };
 
     await addEntry(entry);
     setProtein("");
     setCalories("");
+    setSaturatedFat("");
     await load();
   };
 
@@ -76,6 +85,10 @@ export default function Today({ dateKey, onGoHistory }: Props) {
         <div className="total-card">
           <span className="total-value">{totalCalories}</span>
           <span className="total-label">Calories</span>
+        </div>
+        <div className="total-card">
+          <span className="total-value">{totalSaturatedFat}g</span>
+          <span className="total-label">Sat. Fat</span>
         </div>
       </div>
 
@@ -98,6 +111,15 @@ export default function Today({ dateKey, onGoHistory }: Props) {
           min={0}
           max={5000}
         />
+        <input
+          type="number"
+          inputMode="numeric"
+          placeholder="Sat. Fat (g)"
+          value={saturatedFat}
+          onChange={(e) => setSaturatedFat(e.target.value)}
+          min={0}
+          max={200}
+        />
       </div>
       {error && <div className="error">{error}</div>}
       <button className="btn-primary" onClick={handleSubmit}>
@@ -114,7 +136,7 @@ export default function Today({ dateKey, onGoHistory }: Props) {
             <div className="entry-info">
               <span className="entry-time">{formatTime(e.timestamp)}</span>
               <span className="entry-macros">
-                {e.proteinGrams}g &middot; {e.calories} cal
+                {e.proteinGrams}g protein &middot; {e.calories} cal &middot; {e.saturatedFatGrams ?? 0}g sat. fat
               </span>
             </div>
             <button className="btn-sm btn-danger" onClick={() => handleDelete(e.id)}>

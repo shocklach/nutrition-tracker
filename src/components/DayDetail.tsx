@@ -13,6 +13,7 @@ export default function DayDetail({ dateKey, onBack }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editProtein, setEditProtein] = useState("");
   const [editCalories, setEditCalories] = useState("");
+  const [editSaturatedFat, setEditSaturatedFat] = useState("");
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -27,11 +28,13 @@ export default function DayDetail({ dateKey, onBack }: Props) {
 
   const totalProtein = entries.reduce((s, e) => s + e.proteinGrams, 0);
   const totalCalories = entries.reduce((s, e) => s + e.calories, 0);
+  const totalSaturatedFat = entries.reduce((s, e) => s + (e.saturatedFatGrams ?? 0), 0);
 
   const startEdit = (e: Entry) => {
     setEditingId(e.id);
     setEditProtein(String(e.proteinGrams));
     setEditCalories(String(e.calories));
+    setEditSaturatedFat(String(e.saturatedFatGrams ?? 0));
     setError("");
   };
 
@@ -44,7 +47,8 @@ export default function DayDetail({ dateKey, onBack }: Props) {
     setError("");
     const p = parseInt(editProtein, 10);
     const c = parseInt(editCalories, 10);
-    if (isNaN(p) || isNaN(c)) {
+    const f = parseInt(editSaturatedFat, 10);
+    if (isNaN(p) || isNaN(c) || isNaN(f)) {
       setError("Enter valid numbers.");
       return;
     }
@@ -56,7 +60,11 @@ export default function DayDetail({ dateKey, onBack }: Props) {
       setError("Calories must be 0-5000.");
       return;
     }
-    await updateEntry(editingId!, { proteinGrams: p, calories: c });
+    if (f < 0 || f > 200) {
+      setError("Saturated fat must be 0-200g.");
+      return;
+    }
+    await updateEntry(editingId!, { proteinGrams: p, calories: c, saturatedFatGrams: f });
     setEditingId(null);
     await load();
   };
@@ -85,6 +93,10 @@ export default function DayDetail({ dateKey, onBack }: Props) {
           <span className="total-value">{totalCalories}</span>
           <span className="total-label">Calories</span>
         </div>
+        <div className="total-card">
+          <span className="total-value">{totalSaturatedFat}g</span>
+          <span className="total-label">Sat. Fat</span>
+        </div>
       </div>
 
       <div className="entries-list">
@@ -112,6 +124,15 @@ export default function DayDetail({ dateKey, onBack }: Props) {
                     min={0}
                     max={5000}
                   />
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={editSaturatedFat}
+                    onChange={(ev) => setEditSaturatedFat(ev.target.value)}
+                    placeholder="Sat. Fat (g)"
+                    min={0}
+                    max={200}
+                  />
                 </div>
                 {error && <div className="error">{error}</div>}
                 <div className="edit-actions">
@@ -128,7 +149,7 @@ export default function DayDetail({ dateKey, onBack }: Props) {
                 <div className="entry-info">
                   <span className="entry-time">{formatTime(e.timestamp)}</span>
                   <span className="entry-macros">
-                    {e.proteinGrams}g &middot; {e.calories} cal
+                    {e.proteinGrams}g protein &middot; {e.calories} cal &middot; {e.saturatedFatGrams ?? 0}g sat. fat
                   </span>
                 </div>
                 <div className="entry-actions">
