@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { DaySummary } from "../types";
 import { listRecentDays, exportCsv } from "../db";
-import { formatDateKey, getRecentDateKeys, downloadCsv } from "../utils";
+import { formatDateKey, getRecentDateKeys, shareCsv } from "../utils";
 
 interface Props {
   onGoToday: () => void;
@@ -18,12 +18,12 @@ export default function History({ onGoToday, onSelectDay }: Props) {
   const handleExport7 = async () => {
     const keys = getRecentDateKeys(7);
     const csv = await exportCsv(keys);
-    downloadCsv(csv, "nutrition-7days.csv");
+    await shareCsv(csv, "nutrition-7days.csv");
   };
 
   const handleExportAll = async () => {
     const csv = await exportCsv();
-    downloadCsv(csv, "nutrition-all.csv");
+    await shareCsv(csv, "nutrition-all.csv");
   };
 
   return (

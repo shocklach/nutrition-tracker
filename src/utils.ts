@@ -50,6 +50,26 @@ export function downloadCsv(csv: string, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+// On iOS this opens the native share sheet with the CSV as a shareable file,
+// so it can be saved to Files / iCloud Drive or handed to a Shortcut in one tap.
+// Falls back to a normal download on desktop or where file sharing is unsupported.
+export async function shareCsv(csv: string, filename: string): Promise<void> {
+  try {
+    const file = new File([csv], filename, { type: "text/csv" });
+    const nav = navigator as Navigator & {
+      canShare?: (data: { files: File[] }) => boolean;
+    };
+    if (nav.canShare && nav.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    }
+  } catch (err) {
+    // User cancelled the share sheet, or sharing failed — fall through to download.
+    if (err instanceof DOMException && err.name === "AbortError") return;
+  }
+  downloadCsv(csv, filename);
+}
+
 export function newId(): string {
   // crypto.randomUUID() requires HTTPS; fall back for plain HTTP (e.g. LAN access)
   if (typeof crypto.randomUUID === "function") {
