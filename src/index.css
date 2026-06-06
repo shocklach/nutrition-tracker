@@ -83,11 +83,13 @@ body {
 /* Totals */
 .totals {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
 .total-card {
-  flex: 1;
+  flex: 1 1 calc(50% - 6px);
+  min-width: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -99,7 +101,7 @@ body {
 }
 
 .total-value {
-  font-size: 1.75rem;
+  font-size: 1.6rem;
   font-weight: 700;
 }
 
@@ -113,11 +115,13 @@ body {
 /* Inputs */
 .input-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
 .input-row input {
-  flex: 1;
+  flex: 1 1 calc(50% - 5px);
+  min-width: 0;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);

@@ -1,3 +1,9 @@
+// Round to 1 decimal place to avoid floating-point noise when summing
+// decimal entries (e.g. 0.1 + 0.2 = 0.30000000000000004).
+export function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
 export function getTodayDateKey(): string {
   const now = new Date();
   const y = now.getFullYear();

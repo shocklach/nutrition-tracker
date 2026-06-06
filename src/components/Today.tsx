@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Entry } from "../types";
 import { addEntry, listEntriesByDateKey, deleteEntry } from "../db";
-import { formatTime, formatDateKey, newId } from "../utils";
+import { formatTime, formatDateKey, newId, round1 } from "../utils";
 
 interface Props {
   dateKey: string;
@@ -13,6 +13,7 @@ export default function Today({ dateKey, onGoHistory }: Props) {
   const [protein, setProtein] = useState("");
   const [calories, setCalories] = useState("");
   const [saturatedFat, setSaturatedFat] = useState("");
+  const [fiber, setFiber] = useState("");
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -27,15 +28,17 @@ export default function Today({ dateKey, onGoHistory }: Props) {
 
   const totalProtein = entries.reduce((s, e) => s + e.proteinGrams, 0);
   const totalCalories = entries.reduce((s, e) => s + e.calories, 0);
-  const totalSaturatedFat = entries.reduce((s, e) => s + (e.saturatedFatGrams ?? 0), 0);
+  const totalSaturatedFat = round1(entries.reduce((s, e) => s + (e.saturatedFatGrams ?? 0), 0));
+  const totalFiber = round1(entries.reduce((s, e) => s + (e.fiberGrams ?? 0), 0));
 
   const handleSubmit = async () => {
     setError("");
     const p = parseInt(protein, 10);
     const c = parseInt(calories, 10);
-    const f = parseInt(saturatedFat, 10);
+    const f = parseFloat(saturatedFat);
+    const fib = parseFloat(fiber);
 
-    if (isNaN(p) || isNaN(c) || isNaN(f)) {
+    if (isNaN(p) || isNaN(c) || isNaN(f) || isNaN(fib)) {
       setError("Enter valid numbers.");
       return;
     }
@@ -51,6 +54,10 @@ export default function Today({ dateKey, onGoHistory }: Props) {
       setError("Saturated fat must be 0-200g.");
       return;
     }
+    if (fib < 0 || fib > 200) {
+      setError("Fiber must be 0-200g.");
+      return;
+    }
 
     const entry: Entry = {
       id: newId(),
@@ -59,12 +66,14 @@ export default function Today({ dateKey, onGoHistory }: Props) {
       proteinGrams: p,
       calories: c,
       saturatedFatGrams: f,
+      fiberGrams: fib,
     };
 
     await addEntry(entry);
     setProtein("");
     setCalories("");
     setSaturatedFat("");
+    setFiber("");
     await load();
   };
 
@@ -90,6 +99,10 @@ export default function Today({ dateKey, onGoHistory }: Props) {
           <span className="total-value">{totalSaturatedFat}g</span>
           <span className="total-label">Sat. Fat</span>
         </div>
+        <div className="total-card">
+          <span className="total-value">{totalFiber}g</span>
+          <span className="total-label">Fiber</span>
+        </div>
       </div>
 
       <div className="input-row">
@@ -113,10 +126,21 @@ export default function Today({ dateKey, onGoHistory }: Props) {
         />
         <input
           type="number"
-          inputMode="numeric"
+          inputMode="decimal"
+          step="0.1"
           placeholder="Sat. Fat (g)"
           value={saturatedFat}
           onChange={(e) => setSaturatedFat(e.target.value)}
+          min={0}
+          max={200}
+        />
+        <input
+          type="number"
+          inputMode="decimal"
+          step="0.1"
+          placeholder="Fiber (g)"
+          value={fiber}
+          onChange={(e) => setFiber(e.target.value)}
           min={0}
           max={200}
         />
@@ -136,7 +160,7 @@ export default function Today({ dateKey, onGoHistory }: Props) {
             <div className="entry-info">
               <span className="entry-time">{formatTime(e.timestamp)}</span>
               <span className="entry-macros">
-                {e.proteinGrams}g protein &middot; {e.calories} cal &middot; {e.saturatedFatGrams ?? 0}g sat. fat
+                {e.proteinGrams}g protein &middot; {e.calories} cal &middot; {round1(e.saturatedFatGrams ?? 0)}g sat. fat &middot; {round1(e.fiberGrams ?? 0)}g fiber
               </span>
             </div>
             <button className="btn-sm btn-danger" onClick={() => handleDelete(e.id)}>
