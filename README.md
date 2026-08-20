@@ -6,7 +6,7 @@ deployed to GitHub Pages.
 Entries are stored as `entries.json` in a **separate private repo**, so every
 device shares one history — and a Custom GPT can log meals into it directly.
 
-**Setup (one time):** [`docs/SETUP.md`](docs/SETUP.md)
+**Setup (one time):** [`docs/SETUP.md`](docs/SETUP.md) — or run [`scripts/bootstrap-data-repo.sh`](scripts/bootstrap-data-repo.sh) to create the data repo in one command
 
 - [`data-repo/`](data-repo/) — files to copy into the private data repo
 - [`docs/chatgpt-action.json`](docs/chatgpt-action.json) — OpenAPI schema for the GPT Action

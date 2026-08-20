@@ -7,7 +7,7 @@
   },
   "servers": [{ "url": "https://api.github.com" }],
   "paths": {
-    "/repos/OWNER/REPO/dispatches": {
+    "/repos/shocklach/nutrition-log/dispatches": {
       "post": {
         "operationId": "logNutritionEntry",
         "summary": "Log one meal to the nutrition tracker",
