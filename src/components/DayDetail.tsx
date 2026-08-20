@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import type { Entry } from "../types";
 import { listEntriesByDateKey, deleteEntry, updateEntry } from "../db";
 import { formatTime, formatDateKey, round1 } from "../utils";
+import { parseMacros } from "../validation";
+import EntryRow from "./EntryRow";
 
 interface Props {
   dateKey: string;
@@ -15,7 +17,9 @@ export default function DayDetail({ dateKey, onBack }: Props) {
   const [editCalories, setEditCalories] = useState("");
   const [editSaturatedFat, setEditSaturatedFat] = useState("");
   const [editFiber, setEditFiber] = useState("");
+  const [editNote, setEditNote] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     const list = await listEntriesByDateKey(dateKey);
@@ -38,6 +42,7 @@ export default function DayDetail({ dateKey, onBack }: Props) {
     setEditCalories(String(e.calories));
     setEditSaturatedFat(String(e.saturatedFatGrams ?? 0));
     setEditFiber(String(e.fiberGrams ?? 0));
+    setEditNote(e.note ?? "");
     setError("");
   };
 
@@ -48,39 +53,38 @@ export default function DayDetail({ dateKey, onBack }: Props) {
 
   const saveEdit = async () => {
     setError("");
-    const p = parseInt(editProtein, 10);
-    const c = parseInt(editCalories, 10);
-    const f = parseFloat(editSaturatedFat);
-    const fib = parseFloat(editFiber);
-    if (isNaN(p) || isNaN(c) || isNaN(f) || isNaN(fib)) {
-      setError("Enter valid numbers.");
+    const result = parseMacros({
+      protein: editProtein,
+      calories: editCalories,
+      saturatedFat: editSaturatedFat,
+      fiber: editFiber,
+    });
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-    if (p < 0 || p > 500) {
-      setError("Protein must be 0-500g.");
-      return;
+
+    setBusy(true);
+    try {
+      await updateEntry(editingId!, { ...result.macros, note: editNote.trim() || undefined });
+      setEditingId(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save that change.");
+    } finally {
+      setBusy(false);
     }
-    if (c < 0 || c > 5000) {
-      setError("Calories must be 0-5000.");
-      return;
-    }
-    if (f < 0 || f > 200) {
-      setError("Saturated fat must be 0-200g.");
-      return;
-    }
-    if (fib < 0 || fib > 200) {
-      setError("Fiber must be 0-200g.");
-      return;
-    }
-    await updateEntry(editingId!, { proteinGrams: p, calories: c, saturatedFatGrams: f, fiberGrams: fib });
-    setEditingId(null);
-    await load();
   };
 
   const handleDelete = async (id: string) => {
-    await deleteEntry(id);
-    if (editingId === id) setEditingId(null);
-    await load();
+    setError("");
+    try {
+      await deleteEntry(id);
+      if (editingId === id) setEditingId(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete that entry.");
+    }
   };
 
   return (
@@ -113,9 +117,9 @@ export default function DayDetail({ dateKey, onBack }: Props) {
 
       <div className="entries-list">
         {entries.length === 0 && <p className="empty">No entries.</p>}
-        {entries.map((e) => (
-          <div key={e.id} className="entry-row">
-            {editingId === e.id ? (
+        {entries.map((e) =>
+          editingId === e.id ? (
+            <div key={e.id} className="entry-row">
               <div className="edit-form">
                 <div className="input-row">
                   <input
@@ -156,38 +160,38 @@ export default function DayDetail({ dateKey, onBack }: Props) {
                     min={0}
                     max={200}
                   />
+                  <input
+                    className="input-full"
+                    type="text"
+                    value={editNote}
+                    onChange={(ev) => setEditNote(ev.target.value)}
+                    placeholder="What was it? (optional)"
+                  />
                 </div>
                 {error && <div className="error">{error}</div>}
                 <div className="edit-actions">
-                  <button className="btn-sm btn-primary" onClick={saveEdit}>
-                    Save
+                  <button className="btn-sm btn-primary" onClick={saveEdit} disabled={busy}>
+                    {busy ? "Saving…" : "Save"}
                   </button>
                   <button className="btn-sm btn-secondary" onClick={cancelEdit}>
                     Cancel
                   </button>
                 </div>
               </div>
-            ) : (
-              <>
-                <div className="entry-info">
-                  <span className="entry-time">{formatTime(e.timestamp)}</span>
-                  <span className="entry-macros">
-                    {e.proteinGrams}g protein &middot; {e.calories} cal &middot; {round1(e.saturatedFatGrams ?? 0)}g sat. fat &middot; {round1(e.fiberGrams ?? 0)}g fiber
-                  </span>
-                </div>
-                <div className="entry-actions">
-                  <button className="btn-sm btn-secondary" onClick={() => startEdit(e)}>
-                    Edit
-                  </button>
-                  <button className="btn-sm btn-danger" onClick={() => handleDelete(e.id)}>
-                    Delete
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        ))}
+            </div>
+          ) : (
+            <EntryRow key={e.id} entry={e} time={formatTime(e.timestamp)}>
+              <button className="btn-sm btn-secondary" onClick={() => startEdit(e)}>
+                Edit
+              </button>
+              <button className="btn-sm btn-danger" onClick={() => handleDelete(e.id)}>
+                Delete
+              </button>
+            </EntryRow>
+          )
+        )}
       </div>
+      {error && !editingId && <div className="error">{error}</div>}
     </div>
   );
 }
