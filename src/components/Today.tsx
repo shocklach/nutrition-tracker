@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import type { Entry } from "../types";
 import { addEntry, listEntriesByDateKey, deleteEntry } from "../db";
 import { formatTime, formatDateKey, newId, round1 } from "../utils";
+import { parseMacros } from "../validation";
+import EntryRow from "./EntryRow";
 
 interface Props {
   dateKey: string;
@@ -14,7 +16,9 @@ export default function Today({ dateKey, onGoHistory }: Props) {
   const [calories, setCalories] = useState("");
   const [saturatedFat, setSaturatedFat] = useState("");
   const [fiber, setFiber] = useState("");
+  const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     const list = await listEntriesByDateKey(dateKey);
@@ -33,29 +37,9 @@ export default function Today({ dateKey, onGoHistory }: Props) {
 
   const handleSubmit = async () => {
     setError("");
-    const p = parseInt(protein, 10);
-    const c = parseInt(calories, 10);
-    const f = parseFloat(saturatedFat);
-    const fib = parseFloat(fiber);
-
-    if (isNaN(p) || isNaN(c) || isNaN(f) || isNaN(fib)) {
-      setError("Enter valid numbers.");
-      return;
-    }
-    if (p < 0 || p > 500) {
-      setError("Protein must be 0-500g.");
-      return;
-    }
-    if (c < 0 || c > 5000) {
-      setError("Calories must be 0-5000.");
-      return;
-    }
-    if (f < 0 || f > 200) {
-      setError("Saturated fat must be 0-200g.");
-      return;
-    }
-    if (fib < 0 || fib > 200) {
-      setError("Fiber must be 0-200g.");
+    const result = parseMacros({ protein, calories, saturatedFat, fiber });
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
 
@@ -63,23 +47,37 @@ export default function Today({ dateKey, onGoHistory }: Props) {
       id: newId(),
       timestamp: new Date().toISOString(),
       dateKey,
-      proteinGrams: p,
-      calories: c,
-      saturatedFatGrams: f,
-      fiberGrams: fib,
+      ...result.macros,
+      ...(note.trim() ? { note: note.trim() } : {}),
+      source: "manual",
     };
 
-    await addEntry(entry);
-    setProtein("");
-    setCalories("");
-    setSaturatedFat("");
-    setFiber("");
-    await load();
+    setBusy(true);
+    try {
+      await addEntry(entry);
+      setProtein("");
+      setCalories("");
+      setSaturatedFat("");
+      setFiber("");
+      setNote("");
+      await load();
+    } catch (err) {
+      // The write goes over the network now, so a failure has to be visible
+      // rather than silently dropping the meal.
+      setError(err instanceof Error ? err.message : "Could not save that entry.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
-    await deleteEntry(id);
-    await load();
+    setError("");
+    try {
+      await deleteEntry(id);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete that entry.");
+    }
   };
 
   return (
@@ -144,10 +142,17 @@ export default function Today({ dateKey, onGoHistory }: Props) {
           min={0}
           max={200}
         />
+        <input
+          className="input-full"
+          type="text"
+          placeholder="What was it? (optional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
       </div>
       {error && <div className="error">{error}</div>}
-      <button className="btn-primary" onClick={handleSubmit}>
-        Add Entry
+      <button className="btn-primary" onClick={handleSubmit} disabled={busy}>
+        {busy ? "Saving…" : "Add Entry"}
       </button>
 
       <div className="entries-list">
@@ -156,17 +161,11 @@ export default function Today({ dateKey, onGoHistory }: Props) {
           <p className="empty">No entries yet. Add your first meal!</p>
         )}
         {entries.map((e) => (
-          <div key={e.id} className="entry-row">
-            <div className="entry-info">
-              <span className="entry-time">{formatTime(e.timestamp)}</span>
-              <span className="entry-macros">
-                {e.proteinGrams}g protein &middot; {e.calories} cal &middot; {round1(e.saturatedFatGrams ?? 0)}g sat. fat &middot; {round1(e.fiberGrams ?? 0)}g fiber
-              </span>
-            </div>
+          <EntryRow key={e.id} entry={e} time={formatTime(e.timestamp)}>
             <button className="btn-sm btn-danger" onClick={() => handleDelete(e.id)}>
               Delete
             </button>
-          </div>
+          </EntryRow>
         ))}
       </div>
 
