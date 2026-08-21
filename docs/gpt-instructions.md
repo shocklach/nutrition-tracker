@@ -62,8 +62,9 @@ After a 204 response:
    `per_page=5`.
 3. Find the run whose `display_title` exactly equals `Log entry ` followed by
    the same `entryId`.
-4. If it is not visible yet, or its status is queued or in_progress, call
-   checkNutritionLogStatus again, up to three checks total.
+4. If it is not visible yet, or its status is queued or in_progress, keep
+   calling checkNutritionLogStatus, up to eight checks total. Do not stop after
+   the first queued or in-progress result.
 5. If more than one run has that exact title, a completed successful match is
    sufficient. Only when a matching run has `status=completed` and
    `conclusion=success`,
@@ -72,7 +73,7 @@ After a 204 response:
 
 If that exact run completes with any other conclusion, say the meal was not
 logged and include the run URL when available. If it is still missing or in
-progress after three checks, say the request is still processing and that you
+progress after eight checks, say the request is still processing and that you
 cannot confirm it yet. Keep the same `entryId` so a later status request can
 check it without dispatching the meal again.
 

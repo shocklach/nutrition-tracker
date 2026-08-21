@@ -212,6 +212,7 @@ unset TOKEN
 | `422` | `event_type` was not the literal string `log-entry` |
 | `204` but no Actions run | Workflow not on the default branch (`embrace`), or Actions disabled |
 | GPT logs meals unprompted | Instructions were not pasted, or were edited to drop the explicit-request rule |
+| GPT asks permission for every meal | Confirm the action schema has `x-openai-isConsequential: false` on both operations, then choose **Always allow** once |
 | App shows "Token rejected by GitHub" | The `nutrition-app` token was revoked or mistyped |
 | Entry lands on the wrong day | Time zone drift — check both constants below |
 

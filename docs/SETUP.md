@@ -180,6 +180,11 @@ workspaces, but existing GPTs can still be edited when the account permits it.
    instead see a red parse error, you likely pasted with a character mangled —
    repaste from the raw file.
 
+   The first time ChatGPT asks permission to use either action, choose
+   **Always allow**. The schema marks both operations non-consequential so that
+   choice is available; after the one-time approval, ordinary logging and
+   confirmation checks should run without per-meal prompts.
+
 3. **Privacy policy:** required only if you publish the GPT. Leave blank and
    keep the GPT private to yourself.
 
