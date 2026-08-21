@@ -24,13 +24,37 @@ in this session is blocked from doing it.
 Creates the repo *and* pushes the files. The script lives in this repo, so
 clone it first:
 
-```bash
-brew install gh          # if you do not have it
-gh auth login
+Run these **one at a time** — do not paste them as a block. `gh auth login` is
+interactive, and any lines pasted after it get swallowed as answers to its
+prompts.
 
-git clone -b claude/chatgpt-nutrition-tracker-fzbx4o \
-  https://github.com/shocklach/nutrition-tracker.git
+Check for the GitHub CLI (skip the install if `gh` prints a version):
+
+```bash
+gh --version
+```
+
+```bash
+brew install gh
+```
+
+```bash
+gh auth login
+```
+
+Answer: GitHub.com → HTTPS → authenticate Git with your GitHub credentials
+(yes) → Login with a web browser. Copy the one-time code it prints, press
+Enter, and authorize in the browser that opens.
+
+```bash
+git clone -b claude/chatgpt-nutrition-tracker-fzbx4o https://github.com/shocklach/nutrition-tracker.git
+```
+
+```bash
 cd nutrition-tracker
+```
+
+```bash
 ./scripts/bootstrap-data-repo.sh
 ```
 
