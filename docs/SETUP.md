@@ -20,12 +20,21 @@ publicly readable even when their repo is private, so the log would be exposed.
 This step needs you — GitHub Apps cannot create repositories, so the automation
 in this session is blocked from doing it.
 
-**Option A — one command** (needs the [GitHub CLI](https://cli.github.com),
-authenticated with `gh auth login`). Creates the repo *and* pushes the files:
+**Option A — one script** (needs the [GitHub CLI](https://cli.github.com)).
+Creates the repo *and* pushes the files. The script lives in this repo, so
+clone it first:
 
 ```bash
+brew install gh          # if you do not have it
+gh auth login
+
+git clone -b claude/chatgpt-nutrition-tracker-fzbx4o \
+  https://github.com/shocklach/nutrition-tracker.git
+cd nutrition-tracker
 ./scripts/bootstrap-data-repo.sh
 ```
+
+After this branch is merged to `main` you can drop the `-b ...` flag.
 
 **Option B — in the browser.** Create a repo named **`nutrition-log`**, set it
 to **Private**, and tick *Add a README* so it starts with a branch:
