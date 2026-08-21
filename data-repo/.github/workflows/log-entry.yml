@@ -7,6 +7,29 @@ on:
   repository_dispatch:
     types: [log-entry]
 
+  # Same job, driven by hand from the Actions tab. Useful for verifying the
+  # backend without involving ChatGPT, and for logging a meal from a browser.
+  workflow_dispatch:
+    inputs:
+      proteinGrams:
+        description: Protein (g)
+        required: true
+      calories:
+        description: Calories
+        required: true
+      saturatedFatGrams:
+        description: Saturated fat (g)
+        required: true
+      fiberGrams:
+        description: Fiber (g)
+        required: true
+      note:
+        description: What was it?
+        required: false
+      dateKey:
+        description: Backdate to YYYY-MM-DD (blank = today, US Central)
+        required: false
+
 permissions:
   contents: write
 
@@ -30,8 +53,13 @@ jobs:
         env:
           # Passed through the environment rather than interpolated into the
           # script: client_payload is attacker-controllable text.
-          PAYLOAD: ${{ toJSON(github.event.client_payload) }}
+          PAYLOAD: >-
+            ${{ github.event_name == 'workflow_dispatch'
+                && toJSON(github.event.inputs)
+                || toJSON(github.event.client_payload) }}
           BRANCH: ${{ github.event.repository.default_branch }}
+          # repository_dispatch (ChatGPT) or workflow_dispatch (manual).
+          TRIGGER: ${{ github.event_name }}
         run: |
           set -euo pipefail
 
@@ -56,7 +84,7 @@ jobs:
               exit 0
             fi
 
-            git commit -m "Log meal via ChatGPT"
+            git commit -m "Log meal ($TRIGGER)"
 
             if git push origin "HEAD:$BRANCH"; then
               echo "Pushed on attempt $attempt."

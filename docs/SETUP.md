@@ -202,6 +202,16 @@ check the repo's Actions tab to see the run itself succeed.
 
 ## 7. Test it end to end
 
+The backend is already verified — a test entry was logged through the workflow
+and is sitting in `entries.json`. Delete it from the app once you connect.
+
+To log a meal by hand at any time, or to re-test without ChatGPT: go to
+[Actions → Log entry](https://github.com/shocklach/nutrition-log/actions/workflows/log-entry.yml)
+→ **Run workflow**, fill in the numbers, and Run. That exercises the exact same
+append-and-commit path ChatGPT uses.
+
+To test the GPT itself:
+
 In the GPT: *"I had a chicken burrito bowl with rice, black beans, cheese, and
 guac."* Then: *"log it."*
 
