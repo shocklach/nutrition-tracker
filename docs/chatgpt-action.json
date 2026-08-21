@@ -3,13 +3,14 @@
   "info": {
     "title": "Nutrition Log",
     "description": "Appends a meal to a private nutrition log and confirms the GitHub workflow completed.",
-    "version": "1.1.0"
+    "version": "1.2.0"
   },
   "servers": [{ "url": "https://api.github.com" }],
   "paths": {
     "/repos/shocklach/nutrition-log/dispatches": {
       "post": {
         "operationId": "logNutritionEntry",
+        "x-openai-isConsequential": false,
         "summary": "Log one meal to the nutrition tracker",
         "description": "Records a single meal's estimated nutrition. Call this only when the user explicitly asks to log or save the meal.",
         "requestBody": {
@@ -90,6 +91,7 @@
     "/repos/shocklach/nutrition-log/actions/workflows/log-entry.yml/runs": {
       "get": {
         "operationId": "checkNutritionLogStatus",
+        "x-openai-isConsequential": false,
         "summary": "Check whether a meal was committed",
         "description": "Lists recent nutrition logging workflow runs. Find the run whose display_title exactly equals 'Log entry ' followed by the entryId used in logNutritionEntry. Only a completed run with conclusion 'success' confirms that the meal was committed.",
         "parameters": [
