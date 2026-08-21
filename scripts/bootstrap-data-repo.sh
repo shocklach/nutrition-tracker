@@ -22,8 +22,7 @@ Could not find data-repo/ next to this script.
 
 Run this from inside a clone of the nutrition-tracker repo:
 
-  git clone -b claude/chatgpt-nutrition-tracker-fzbx4o \
-    https://github.com/shocklach/nutrition-tracker.git
+  git clone https://github.com/shocklach/nutrition-tracker.git
   cd nutrition-tracker
   ./scripts/bootstrap-data-repo.sh
 MSG
@@ -77,10 +76,21 @@ trap 'rm -rf "$WORK"' EXIT
 echo "Cloning $OWNER/$REPO..."
 gh repo clone "$OWNER/$REPO" "$WORK/repo" -- --quiet
 
-cp -R "$SOURCE_DIR/." "$WORK/repo/"
+mkdir -p "$WORK/repo/scripts" "$WORK/repo/.github/workflows"
+cp "$SOURCE_DIR/README.md" "$WORK/repo/README.md"
+cp "$SOURCE_DIR/scripts/append-entry.mjs" "$WORK/repo/scripts/append-entry.mjs"
+cp "$SOURCE_DIR/.github/workflows/log-entry.yml" \
+  "$WORK/repo/.github/workflows/log-entry.yml"
+
+# entries.json is live health data. Seed it only when it does not exist; never
+# replace an existing log with the empty template during an update.
+if [ ! -f "$WORK/repo/entries.json" ]; then
+  cp "$SOURCE_DIR/entries.json" "$WORK/repo/entries.json"
+fi
 
 cd "$WORK/repo"
-git add .
+git add -- README.md entries.json scripts/append-entry.mjs \
+  .github/workflows/log-entry.yml
 
 if git diff --cached --quiet; then
   echo "Nothing to push — files already up to date."
@@ -94,5 +104,6 @@ echo
 echo "$OWNER/$REPO now contains:"
 git ls-files | sed 's/^/  /'
 echo
-echo "Next: create two fine-grained tokens (Contents: Read and write, scoped to"
-echo "$REPO) at https://github.com/settings/personal-access-tokens/new"
+echo "Token permissions: both need Contents: Read and write on $REPO."
+echo "nutrition-gpt also needs Actions: Read-only for commit confirmation."
+echo "Manage tokens at https://github.com/settings/personal-access-tokens"
