@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Nutrition Log",
-    "description": "Appends a meal to a private nutrition log stored in GitHub.",
-    "version": "1.0.0"
+    "description": "Appends a meal to a private nutrition log and confirms the GitHub workflow completed.",
+    "version": "1.1.0"
   },
   "servers": [{ "url": "https://api.github.com" }],
   "paths": {
@@ -29,12 +29,18 @@
                   "client_payload": {
                     "type": "object",
                     "required": [
+                      "entryId",
                       "proteinGrams",
                       "calories",
                       "saturatedFatGrams",
                       "fiberGrams"
                     ],
                     "properties": {
+                      "entryId": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$",
+                        "description": "A unique ID for this logging request. Create it once and reuse the exact same value for every retry or status check for this meal."
+                      },
                       "proteinGrams": {
                         "type": "number",
                         "minimum": 0,
@@ -77,7 +83,68 @@
           }
         },
         "responses": {
-          "204": { "description": "Meal accepted and queued for logging." }
+          "204": { "description": "Meal accepted for processing. This does not confirm that it was committed; call checkNutritionLogStatus with the same entryId." }
+        }
+      }
+    },
+    "/repos/shocklach/nutrition-log/actions/workflows/log-entry.yml/runs": {
+      "get": {
+        "operationId": "checkNutritionLogStatus",
+        "summary": "Check whether a meal was committed",
+        "description": "Lists recent nutrition logging workflow runs. Find the run whose display_title exactly equals 'Log entry ' followed by the entryId used in logNutritionEntry. Only a completed run with conclusion 'success' confirms that the meal was committed.",
+        "parameters": [
+          {
+            "name": "event",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["repository_dispatch"],
+              "default": "repository_dispatch"
+            },
+            "description": "Always repository_dispatch."
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "enum": [5],
+              "default": 5
+            },
+            "description": "Always return the 5 most recent runs."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent nutrition logging workflow runs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["workflow_runs"],
+                  "properties": {
+                    "workflow_runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["id", "display_title", "status"],
+                        "properties": {
+                          "id": { "type": "integer" },
+                          "display_title": { "type": "string" },
+                          "status": { "type": "string" },
+                          "conclusion": { "type": ["string", "null"] },
+                          "html_url": { "type": "string", "format": "uri" },
+                          "created_at": { "type": "string", "format": "date-time" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

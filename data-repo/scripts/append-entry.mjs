@@ -5,7 +5,6 @@
 // nothing from it is ever interpolated into a shell command.
 
 import { readFile, writeFile } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
 
 // Must match APP_TIME_ZONE in the app's src/utils.ts. The runner is UTC, so
 // without this a 7pm Central dinner would be filed under the next day.
@@ -46,9 +45,27 @@ function requireNumber(payload, field) {
   return bound.integer ? Math.round(value) : Math.round(value * 10) / 10;
 }
 
+function requireEntryId(payload) {
+  const value = process.env.ENTRY_ID || payload.entryId;
+  if (
+    typeof value !== "string" ||
+    !/^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$/.test(value)
+  ) {
+    fail("entryId must be 8-64 letters, numbers, hyphens, or underscores.");
+  }
+  return value;
+}
+
+function isValidDateKey(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  if (year < 1000 || month < 1 || month > 12 || day < 1) return false;
+  return day <= new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
 function resolveDateKey(payload) {
   const supplied = payload.dateKey;
-  if (typeof supplied === "string" && /^\d{4}-\d{2}-\d{2}$/.test(supplied)) {
+  if (typeof supplied === "string" && isValidDateKey(supplied)) {
     return supplied;
   }
   if (supplied !== undefined && supplied !== null && supplied !== "") {
@@ -85,8 +102,8 @@ async function readLog() {
 const payload = readPayload();
 
 const entry = {
-  // Stable across push retries so a retried run cannot double-log the meal.
-  id: process.env.ENTRY_ID || randomUUID(),
+  // Supplied by the client and reused across Action retries and workflow runs.
+  id: requireEntryId(payload),
   timestamp: new Date().toISOString(),
   dateKey: resolveDateKey(payload),
   proteinGrams: requireNumber(payload, "proteinGrams"),

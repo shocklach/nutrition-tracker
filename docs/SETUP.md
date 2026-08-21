@@ -47,7 +47,7 @@ Answer: GitHub.com → HTTPS → authenticate Git with your GitHub credentials
 Enter, and authorize in the browser that opens.
 
 ```bash
-git clone -b claude/chatgpt-nutrition-tracker-fzbx4o https://github.com/shocklach/nutrition-tracker.git
+git clone https://github.com/shocklach/nutrition-tracker.git
 ```
 
 ```bash
@@ -57,8 +57,6 @@ cd nutrition-tracker
 ```bash
 ./scripts/bootstrap-data-repo.sh
 ```
-
-After this branch is merged to `main` you can drop the `-b ...` flag.
 
 **Option B — in the browser.** Create a repo named **`nutrition-log`**, set it
 to **Private**, and tick *Add a README* so it starts with a branch:
@@ -88,20 +86,25 @@ tokens, so it cannot be automated by anything, including Claude.
 Go to: <https://github.com/settings/personal-access-tokens/new>
 
 Create **two** tokens so either can be revoked without breaking the other.
-Give both of them *identical* settings:
+Both are restricted to the private data repo, but the GPT token also needs
+read-only access to workflow status so it can confirm that a meal was actually
+committed:
 
-| Field | Value |
-| --- | --- |
-| Token name | `nutrition-app` (first) / `nutrition-gpt` (second) |
-| Resource owner | `shocklach` |
-| Expiration | your call — see the warning below |
-| Repository access | **Only select repositories** → `nutrition-log` |
-| Permissions → Repository → **Contents** | **Read and write** |
+| Setting | `nutrition-app` | `nutrition-gpt` |
+| --- | --- | --- |
+| Resource owner | `shocklach` | `shocklach` |
+| Repository access | **Only select repositories** → `nutrition-log` | **Only select repositories** → `nutrition-log` |
+| Repository → **Contents** | **Read and write** | **Read and write** |
+| Repository → **Actions** | No access | **Read-only** |
 
 Leave every other permission alone. *Metadata: Read-only* is added
-automatically and is required. `Contents: Read and write` is what allows both
-the file writes and the `repository_dispatch` call the GPT makes — no other
-permission is needed.
+automatically and is required. GitHub requires `Contents: Read and write` for
+the `repository_dispatch` call. The GPT's additional `Actions: Read-only`
+permission lets it check the matching workflow run; it cannot rerun, cancel,
+or edit workflows with that permission.
+
+If the tokens already exist, edit `nutrition-gpt` and add **Actions: Read-only**
+instead of creating another token.
 
 Copy each token immediately; GitHub shows it once.
 
@@ -145,13 +148,15 @@ id and by an exact timestamp-and-values match.
 
 Do the phone and the computer one at a time, and confirm the count after each.
 
-## 6. Create the Custom GPT
+## 6. Configure the Custom GPT
 
-A Custom GPT requires ChatGPT Plus/Pro. The action only fires inside this GPT —
-plain ChatGPT conversations cannot call it.
+The action only fires inside the GPT where it is configured — plain ChatGPT
+conversations cannot call it.
 
-**Create it:** ChatGPT → sidebar **GPTs** → **+ Create** → **Configure** tab
-(skip the chat-based builder; it is slower for this).
+For a personal ChatGPT account, use an existing GPT that you are still allowed
+to edit: ChatGPT on the web → **GPTs** → **My GPTs** → choose the private GPT →
+**Edit GPT**. New GPT creation is only available in eligible managed
+workspaces, but existing GPTs can still be edited when the account permits it.
 
 **Name:** something short you will pick out of a list — *Nutrition*.
 
@@ -170,9 +175,10 @@ plain ChatGPT conversations cannot call it.
    [`chatgpt-action.json`](chatgpt-action.json). It already points at
    `shocklach/nutrition-log`.
 
-   ChatGPT parses it immediately. You should see one available action,
-   `logNutritionEntry`, appear underneath. If you instead see a red parse error,
-   you likely pasted with a character mangled — repaste from the raw file.
+   ChatGPT parses it immediately. You should see two available actions,
+   `logNutritionEntry` and `checkNutritionLogStatus`, appear underneath. If you
+   instead see a red parse error, you likely pasted with a character mangled —
+   repaste from the raw file.
 
 3. **Privacy policy:** required only if you publish the GPT. Leave blank and
    keep the GPT private to yourself.
@@ -181,9 +187,12 @@ plain ChatGPT conversations cannot call it.
 
 ### Testing the action from the editor
 
-The action row has a **Test** button. It will invent placeholder values and call
-the endpoint. A successful call shows a `204` with an empty response — that is
-the expected result, not an error. GitHub returns no body for a dispatch.
+Each action row has a **Test** button. Testing `logNutritionEntry` requires an
+`entryId` plus the four nutrition values. A successful dispatch shows a `204`
+with an empty response — expected, but not yet proof of a commit. Then test
+`checkNutritionLogStatus` with `event=repository_dispatch` and `per_page=5`.
+The matching run is confirmed only when its status is `completed` and its
+conclusion is `success`.
 
 If the test writes a junk meal to your log, delete it in the app afterwards.
 
@@ -192,13 +201,15 @@ If the test writes a junk meal to your log, delete it in the app afterwards.
 | What you see | Cause |
 | --- | --- |
 | `401 Bad credentials` | Token wrong, or Auth Type not set to **Bearer** |
-| `403` | Token lacks **Contents: Read and write**, or is not scoped to `nutrition-log` |
+| `403` from logging | Token lacks **Contents: Read and write**, or is not scoped to `nutrition-log` |
+| `403` from status check | Token lacks **Actions: Read-only** |
 | `404 Not Found` | Repo name wrong in the schema path, or the token cannot see the repo |
 | `422` | `event_type` was not sent as `log-entry` |
 | 204, but no Actions run | Workflow file not on the repo's **default branch**, or Actions disabled |
 
-A 204 means GitHub accepted the dispatch, not that the entry was written —
-check the repo's Actions tab to see the run itself succeed.
+A 204 means GitHub accepted the dispatch, not that the entry was written. The
+GPT must find the run named `Log entry <entryId>` and wait for its successful
+conclusion before saying "Logged."
 
 ## 7. Test it end to end
 
@@ -220,6 +231,7 @@ Check that:
 - `entries.json` has a new record
 - the app shows the meal (it re-syncs when you switch back to it; the gear menu
   has **Sync now**)
+- the GPT says "Logged" only after its matching Actions run succeeds
 
 Typical delay between "log it" and the commit is 10–30 seconds — the Action has
 to spin up a runner.

@@ -23,7 +23,7 @@ a separate history and nothing external could write to it. That is now fixed.
 ```
                     ┌──────────────────────────────┐
   Custom GPT ──────▶│  POST /repos/.../dispatches  │
-  ("log it")        │  event_type: log-entry       │
+  ("log it")        │  then GET matching run status│
                     └──────────────┬───────────────┘
                                    │ triggers
                                    ▼
@@ -65,7 +65,7 @@ read and its write). Neither writer clobbers the other.
 | Dispatch endpoint | `POST https://api.github.com/repos/shocklach/nutrition-log/dispatches` |
 | Dispatch event type | `log-entry` |
 | Time zone | `America/Chicago`, hardcoded in two places (see gotchas) |
-| Tokens | Two fine-grained PATs, **no expiration**, Contents: Read and write, scoped to `nutrition-log` only |
+| Required token permissions | Both tokens: Contents: Read and write on `nutrition-log`; `nutrition-gpt` additionally requires Actions: Read-only for commit confirmation |
 
 **The data repo's default branch is `embrace`, not `main`.** The user's GitHub
 account has a custom default-branch-name setting. All existing code reads the
@@ -97,6 +97,7 @@ when writing anything new that touches this repo.
 - [ ] App connected on the user's **laptop** (30 seconds, user action)
 - [ ] Old history imported — status unknown, ask the user. Gear icon →
       "Bring in old history" on each device that has pre-sync entries.
+- [ ] Add Actions: Read-only to the existing `nutrition-gpt` token
 - [ ] **The Custom GPT** ← the actual remaining work
 - [ ] Delete the test entry once the user has seen it in the app
 
@@ -114,7 +115,8 @@ when writing anything new that touches this repo.
 
 ### Configuration
 
-1. ChatGPT → **GPTs** → **+ Create** → **Configure** tab.
+1. ChatGPT on the web → **GPTs** → **My GPTs** → choose an existing private
+   GPT that is still editable → **Edit GPT**.
 2. Name it something short, e.g. *Nutrition*.
 3. **Instructions** ← the block from `docs/gpt-instructions.md`.
 4. **Actions** → *Create new action*:
@@ -122,7 +124,8 @@ when writing anything new that touches this repo.
      `nutrition-gpt` token. **Bearer, not Basic** — this is the single most
      common misconfiguration.
    - **Schema**: paste `docs/chatgpt-action.json`.
-   - One action, `logNutritionEntry`, should appear below the schema box.
+   - Two actions, `logNutritionEntry` and `checkNutritionLogStatus`, should
+     appear below the schema box.
 5. Privacy policy: only required to publish. Leave blank, save as **Only me**.
 
 ### Payload contract
@@ -131,6 +134,7 @@ when writing anything new that touches this repo.
 {
   "event_type": "log-entry",
   "client_payload": {
+    "entryId": "meal-20260821-184500-a1b2c3",
     "proteinGrams": 42,
     "calories": 610,
     "saturatedFatGrams": 6.5,
@@ -141,6 +145,8 @@ when writing anything new that touches this repo.
 }
 ```
 
+- `entryId` is required, reused across retries, and becomes the stored entry
+  ID plus the workflow run name used for confirmation.
 - `proteinGrams` (0–500) and `calories` (0–5000) are rounded to integers.
 - `saturatedFatGrams` and `fiberGrams` (0–200) keep one decimal.
 - Strings are coerced to numbers — `"6.5"` works. GPTs often send strings.
@@ -154,12 +160,11 @@ when writing anything new that touches this repo.
 
 ## Known limits — read before promising the user anything
 
-**A Custom GPT cannot be created programmatically.** There is no API for
-creating GPTs or configuring their Actions; it is a web UI flow in the user's
-own OpenAI account. If you cannot drive a browser session logged into that
-account, you cannot do this step — say so plainly rather than attempting
-workarounds. What you *can* do is verify the endpoint, prepare exact
-paste-ready values, and debug whatever the user reports back.
+**A Custom GPT cannot be created or configured programmatically.** On a
+personal ChatGPT account, new GPT creation may be unavailable; use an existing
+private GPT if its editor still allows Actions. Configuration remains a web UI
+flow in the user's own OpenAI account. If you cannot drive a browser session
+logged into that account, say so plainly rather than attempting workarounds.
 
 **Do not ask the user to paste either token into a chat.** They are
 non-expiring and scoped to write the data repo. Neither token needs to pass
@@ -192,7 +197,7 @@ enters an agent's context:
 
 ```bash
 printf 'Paste nutrition-gpt token: '; read -rs TOKEN; echo
-curl -sS -X POST https://api.github.com/repos/shocklach/nutrition-log/dispatches -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" -d '{"event_type":"log-entry","client_payload":{"proteinGrams":42,"calories":610,"saturatedFatGrams":6.5,"fiberGrams":9.2,"note":"token test"}}' -w '\nHTTP %{http_code}\n'
+curl -sS -X POST https://api.github.com/repos/shocklach/nutrition-log/dispatches -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" -d '{"event_type":"log-entry","client_payload":{"entryId":"meal-token-test-0001","proteinGrams":42,"calories":610,"saturatedFatGrams":6.5,"fiberGrams":9.2,"note":"token test"}}' -w '\nHTTP %{http_code}\n'
 unset TOKEN
 ```
 
@@ -202,6 +207,7 @@ unset TOKEN
 | --- | --- |
 | `401 Bad credentials` | Token wrong, or Auth Type is not **Bearer** |
 | `403` | Token lacks Contents: Read and write, or is not scoped to `nutrition-log` |
+| `403` from status check | `nutrition-gpt` lacks Actions: Read-only |
 | `404 Not Found` | Wrong repo in the schema path, or token cannot see the repo |
 | `422` | `event_type` was not the literal string `log-entry` |
 | `204` but no Actions run | Workflow not on the default branch (`embrace`), or Actions disabled |
@@ -209,9 +215,10 @@ unset TOKEN
 | App shows "Token rejected by GitHub" | The `nutrition-app` token was revoked or mistyped |
 | Entry lands on the wrong day | Time zone drift — check both constants below |
 
-**`204 No Content` with an empty body is success.** GitHub returns no body for
-a dispatch. It means GitHub *accepted* the request, not that the entry was
-written — confirm in the repo's Actions tab.
+**`204 No Content` with an empty body is dispatch acceptance, not logging
+confirmation.** The GPT must query recent runs, find `Log entry <entryId>`, and
+say "Logged" only after that matching run is completed with conclusion
+`success`.
 
 ## Do not do these
 
@@ -275,3 +282,6 @@ push the file directly.
   the Contents API needs a read-modify-write with base64 of the whole file.
   Asking a GPT to do that is fragile and degrades as history grows. One flat
   POST is a much better fit for an Action.
+- **Why the GPT also reads workflow status:** `repository_dispatch` returns
+  before the workflow finishes. Polling the matching run keeps the system
+  GitHub-only while making "Logged" mean the append-and-commit job succeeded.
